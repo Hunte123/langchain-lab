@@ -20,9 +20,12 @@ from common import init_llm
 def get_quote(code: str) -> str:
     """查询A股实时行情。code支持600519或sh600519格式；指数如sz399001。盘前返回昨收。"""
 
-    code = code.strip()
-    if re.fullmatch(r"\d{6}", code):
-        code = ("sh" if code.startswith("6") else "sz") + code
+    m = re.search(r"\d{6}", code)  # 容错：Agent传参可能带杂质，提取6位数字
+    if m:
+        c = m.group(0)
+        code = ("sh" if c.startswith("6") else "sz") + c
+    else:
+        code = code.strip()
     r = subprocess.run(
         ["curl", "-s", "-m", "10", "-H", "Referer: https://finance.sina.com.cn",
          f"https://hq.sinajs.cn/list={code}"],

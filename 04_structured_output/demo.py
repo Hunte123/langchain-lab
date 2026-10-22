@@ -24,7 +24,22 @@ class StockBrief(BaseModel):
 llm = init_llm()
 structured = llm.with_structured_output(StockBrief)
 
-brief = structured.invoke("近期新能源板块大跌，宁德时代单日跌超10%，请分析")
+# 实战提醒：部分模型对 function-calling 式结构化输出支持不稳（如返回纯文本），
+# 生产代码通常带提示词式JSON解析兜底——这也是LangChain的经典姿势之一。
+def analyze(text: str) -> StockBrief:
+    try:
+        return structured.invoke(text)
+    except Exception:
+        from langchain_core.output_parsers import JsonOutputParser
+        from langchain_core.prompts import ChatPromptTemplate
+        parser = JsonOutputParser(pydantic_object=StockBrief)
+        prompt = ChatPromptTemplate.from_template(
+            "{text}\n\n{format_instructions}\n只输出JSON，不要其他内容。")
+        chain = prompt | llm | JsonOutputParser()
+        data = chain.invoke({"text": text, "format_instructions": parser.get_format_instructions()})
+        return StockBrief(**data)
+
+brief = analyze("近期新能源板块大跌，宁德时代单日跌超10%，请分析")
 print("【结构化】", type(brief).__name__)          # 直接拿到Python对象
 print(f"  结论: {brief.sentiment}  置信度: {brief.confidence:.0%}")
 for r in brief.reasons:
